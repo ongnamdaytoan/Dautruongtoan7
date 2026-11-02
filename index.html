@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đấu Trường Toán Học 7 - Đấu Online</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- MediaPipe Face Mesh -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    .pulse-card {
+      animation: pulse-subtle 2s infinite ease-in-out;
+    }
+    .mirror-mode {
+      transform: scaleX(-1);
+      -webkit-transform: scaleX(-1);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col font-sans select-none overflow-x-hidden">
+
+  <!-- HEADER -->
+  <header class="py-3 px-4 md:px-6 bg-slate-900/90 border-b border-indigo-900/40 backdrop-blur flex flex-wrap items-center justify-between gap-3 sticky top-0 z-50">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">⚔️</span>
+      <div>
+        <h1 class="text-lg md:text-2xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-200">
+          ĐẤU TRƯỜNG TOÁN HỌC 7
+        </h1>
+        <p class="text-xs text-indigo-300 font-medium">Mỗi lượt 20 câu ngẫu nhiên • Lắc đầu để chọn đáp án</p>
+      </div>
+    </div>
+
+    <!-- BẢNG ĐIỂM & TIẾN ĐỘ -->
+    <div class="flex items-center gap-3 md:gap-5 bg-slate-800/80 px-4 py-2 rounded-2xl border border-slate-700/60 shadow-inner">
+      <div class="text-center">
+        <span class="text-[10px] md:text-xs uppercase text-slate-400 font-semibold block">Tiến độ</span>
+        <span id="question-progress" class="text-base md:text-lg font-bold text-amber-300">1/20</span>
+      </div>
+      <div class="h-6 w-px bg-slate-700"></div>
+      <div class="text-center">
+        <span class="text-[10px] md:text-xs uppercase text-slate-400 font-semibold block">Điểm</span>
+        <span id="score-display" class="text-base md:text-lg font-extrabold text-emerald-400">0</span>
+      </div>
+      <div class="h-6 w-px bg-slate-700"></div>
+      <div class="text-center">
+        <span class="text-[10px] md:text-xs uppercase text-slate-400 font-semibold block">Chuỗi</span>
+        <span id="streak-display" class="text-base md:text-lg font-bold text-orange-400">🔥 0</span>
+      </div>
+    </div>
+
+    <!-- NÚT ĐIỀU HƯỚNG -->
+    <div class="flex items-center gap-2">
+      <button id="toggle-cam-btn" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-indigo-600/30">
+        <span id="cam-icon">📹</span>
+        <span id="cam-text">Camera AI</span>
+      </button>
+      <button id="sound-btn" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm border border-slate-700 transition" title="Bật/Tắt âm thanh">
+        🔊
+      </button>
+      <button id="restart-btn" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm border border-slate-700 transition" title="Đổi đề mới & chơi lại">
+        🎲 Đề mới
+      </button>
+    </div>
+  </header>
+
+  <!-- NỘI DUNG CHÍNH -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 flex flex-col justify-between gap-5">
+
+    <!-- CÂU HỎI -->
+    <div class="bg-gradient-to-br from-slate-900 to-indigo-950/70 p-6 md:p-8 rounded-3xl border-2 border-indigo-500/30 shadow-2xl relative overflow-hidden flex flex-col items-center justify-center min-h-[170px] text-center">
+      <div class="absolute top-3 left-4 flex items-center gap-2">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+          Chủ đề: <span id="topic-tag" class="ml-1 text-white">Toán 7</span>
+        </span>
+      </div>
+      <div class="absolute top-3 right-4">
+        <div id="status-badge" class="hidden px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"></div>
+      </div>
+
+      <h2 id="question-text" class="text-xl md:text-3xl font-extrabold text-white mt-4 max-w-4xl leading-relaxed">
+        Đang tải câu hỏi...
+      </h2>
+      <p id="explain-box" class="hidden mt-3 text-sm md:text-base font-medium px-4 py-1.5 rounded-xl bg-slate-800/90 text-amber-200 border border-amber-500/30 shadow-md transition-all">
+      </p>
+    </div>
+
+    <!-- 2 ĐÁP ÁN TRÁI / PHẢI -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 relative">
+      
+      <!-- PHƯƠNG ÁN A (TRÁI) -->
+      <div id="card-left" onclick="selectAnswer('left')" class="group relative bg-slate-900/90 hover:bg-slate-850 p-6 md:p-8 rounded-3xl border-2 border-blue-500/40 cursor-pointer transition-all duration-200 transform hover:-translate-y-1 shadow-xl flex flex-col justify-between overflow-hidden min-h-[220px]">
+        <div id="glow-left" class="absolute inset-0 bg-blue-500/10 opacity-0 transition-opacity duration-150 pointer-events-none"></div>
+
+        <div class="flex items-center justify-between z-10">
+          <div class="flex items-center gap-2">
+            <span class="w-9 h-9 rounded-2xl bg-blue-500/20 text-blue-400 border border-blue-500/40 font-black text-lg flex items-center justify-center">A</span>
+            <span class="text-xs md:text-sm font-bold text-blue-300 uppercase tracking-wider">Nghiêng Trái</span>
+          </div>
+          <span class="text-3xl filter drop-shadow">⬅️</span>
+        </div>
+
+        <div class="my-6 z-10 flex items-center justify-center">
+          <span id="text-left" class="text-2xl md:text-4xl font-extrabold text-white text-center tracking-wide group-hover:text-blue-200 transition">
+            Đáp án A
+          </span>
+        </div>
+
+        <div class="w-full bg-slate-800/90 h-3.5 rounded-full overflow-hidden border border-slate-700 z-10">
+          <div id="progress-bar-left" class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 w-0 transition-all duration-75"></div>
+        </div>
+      </div>
+
+      <!-- PHƯƠNG ÁN B (PHẢI) -->
+      <div id="card-right" onclick="selectAnswer('right')" class="group relative bg-slate-900/90 hover:bg-slate-850 p-6 md:p-8 rounded-3xl border-2 border-rose-500/40 cursor-pointer transition-all duration-200 transform hover:-translate-y-1 shadow-xl flex flex-col justify-between overflow-hidden min-h-[220px]">
+        <div id="glow-right" class="absolute inset-0 bg-rose-500/10 opacity-0 transition-opacity duration-150 pointer-events-none"></div>
+
+        <div class="flex items-center justify-between z-10">
+          <span class="text-3xl filter drop-shadow">➡️</span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs md:text-sm font-bold text-rose-300 uppercase tracking-wider">Nghiêng Phải</span>
+            <span class="w-9 h-9 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/40 font-black text-lg flex items-center justify-center">B</span>
+          </div>
+        </div>
+
+        <div class="my-6 z-10 flex items-center justify-center">
+          <span id="text-right" class="text-2xl md:text-4xl font-extrabold text-white text-center tracking-wide group-hover:text-rose-200 transition">
+            Đáp án B
+          </span>
+        </div>
+
+        <div class="w-full bg-slate-800/90 h-3.5 rounded-full overflow-hidden border border-slate-700 z-10">
+          <div id="progress-bar-right" class="h-full bg-gradient-to-r from-rose-500 to-amber-400 w-0 transition-all duration-75"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- KHUNG ĐIỀU HƯỚNG CAMERA VÀ HƯỚNG DẪN -->
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+      <div class="flex items-center gap-3">
+        <div class="relative w-28 h-20 bg-slate-950 rounded-xl overflow-hidden border-2 border-slate-700 shadow-inner flex items-center justify-center">
+          <video id="webcam" class="absolute w-full h-full object-cover mirror-mode" autoplay playsinline muted></video>
+          <canvas id="face-canvas" class="absolute w-full h-full object-cover mirror-mode"></canvas>
+          <span id="cam-loading" class="text-[10px] text-slate-400 text-center px-1">Chờ camera...</span>
+        </div>
+        <div class="text-left">
+          <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+            <span id="ai-indicator" class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block animate-pulse"></span>
+            <span id="ai-status">Đang nạp AI...</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-0.5">Nghiêng đầu giữ 0.7s để chốt</p>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-[10px] text-slate-500">Góc nghiêng:</span>
+            <span id="tilt-angle-deg" class="text-[11px] font-mono font-bold text-cyan-400">0°</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-xs text-slate-400 flex flex-wrap items-center justify-center gap-2">
+        <span>Điều khiển hỗ trợ:</span>
+        <kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded-md font-mono text-slate-300">← Trái</kbd>
+        <kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded-md font-mono text-slate-300">Phải →</kbd>
+        <kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded-md font-mono text-slate-300">Space: Bỏ qua</kbd>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL KẾT QUẢ KHI HẾT 20 CÂU -->
+  <div id="result-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-amber-500/50 p-8 rounded-3xl max-w-lg w-full text-center shadow-2xl relative overflow-hidden">
+      <div class="text-6xl mb-3">🏆</div>
+      <h2 class="text-2xl md:text-3xl font-black text-amber-300 tracking-wide">HOÀN THÀNH 20 CÂU!</h2>
+      <p class="text-slate-300 mt-1 text-sm font-medium">Bạn đã hoàn thành lượt thi đấu Toán học</p>
+
+      <div class="grid grid-cols-2 gap-4 my-6">
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700">
+          <span class="text-xs uppercase text-slate-400 font-semibold block">Tổng điểm</span>
+          <span id="final-score" class="text-3xl font-black text-emerald-400">0</span>
+        </div>
+        <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700">
+          <span class="text-xs uppercase text-slate-400 font-semibold block">Tỉ lệ chính xác</span>
+          <span id="final-accuracy" class="text-3xl font-black text-amber-400">0%</span>
+        </div>
+      </div>
+
+      <div class="flex gap-3 justify-center">
+        <button onclick="startNewGameSession()" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-base shadow-lg shadow-orange-500/30 transition transform hover:-translate-y-0.5">
+          🎲 Bắt đầu 20 câu mới
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // NGÂN HÀNG 60 CÂU HỎI TOÁN 7 TOÀN DIỆN
+    const QUESTION_BANK = [
+      {
+        topic: "Số hữu tỉ",
+        question: "Số nào sau đây biểu diễn một SỐ HỮU TỈ?",
+        left: "-3/5",
+        right: "7/0",
+        correct: "left",
+        explain: "Số hữu tỉ viết được dưới dạng a/b (a, b thuộc Z, b khác 0)."
+      },
+      {
+        topic: "Số hữu tỉ",
+        question: "Số đối của số -7/3 là:",
+        left: "3/7",
+        right: "7/3",
+        correct: "right",
+        explain: "Số đối của -a là a. Đổi dấu và giữ nguyên giá trị."
+      },
+      {
+        topic: "Số hữu tỉ",
+        question: "Giá trị của (-0,5)² bằng bao nhiêu?",
+        left: "0,25",
+        right: "-0,25",
+        correct: "left",
+        explain: "Lũy thừa bậc chẵn của số âm luôn ra số dương: (-0,5) * (-0,5) = 0,25."
+      },
+      {
+        topic: "Số vô tỉ",
+        question: "Trong hai số sau, đâu là SỐ VÔ TỈ?",
+        left: "√25",
+        right: "√5",
+        correct: "right",
+        explain: "√25 = 5 (số hữu tỉ), còn √5 = 2.23606... là số vô tỉ."
+      },
+      {
+        topic: "Lũy thừa",
+        question: "Khẳng định nào sau đây là ĐÚNG?",
+        left: "(x³)⁴ = x¹²",
+        right: "(x³)⁴ = x⁷",
+        correct: "left",
+        explain: "Lũy thừa của lũy thừa: nhân các số mũ (3 * 4 = 12)."
+      },
+      {
+        topic: "Căn bậc hai",
+        question: "Căn bậc hai số học của 49 là:",
+        left: "7",
+        right: "-7 và 7",
+        correct: "left",
+        explain: "Căn bậc hai số học của số dương a là số không âm √a = 7."
+      },
+      {
+        topic: "Số thập phân",
+        question: "Số thập phân 0,151515... được viết gọn là:",
+        left: "0,1(5)",
+        right: "0,(15)",
+        correct: "right",
+        explain: "Chu kì tuần hoàn lặp lại nhóm số 15 nên viết là 0,(15)."
+      },
+      {
+        topic: "Số nghịch đảo",
+        question: "Số nghịch đảo của hỗn số -1 1/3 là:",
+        left: "-3/4",
+        right: "4/3",
+        correct: "left",
+        explain: "-1 1/3 = -4/3. Nghịch đảo giữ nguyên dấu thành -3/4."
+      },
+      {
+        topic: "Tập hợp số",
+        question: "Khẳng định nào đúng về quan hệ tập hợp?",
+        left: "Q ⊂ R",
+        right: "R ⊂ Q",
+        correct: "left",
+        explain: "Tập số hữu tỉ Q là tập con của tập số thực R."
+      },
+      {
+        topic: "Giá trị tuyệt đối",
+        question: "Giá trị tuyệt đối của |-3,5| là:",
+        left: "-3,5",
+        right: "3,5",
+        correct: "right",
+        explain: "Giá trị tuyệt đối của một số luôn luôn không âm."
+      },
+      {
+        topic: "Lũy thừa",
+        question: "Kết quả của phép nhân 2³ · 2⁴ là:",
+        left: "2⁷",
+        right: "2¹²",
+        correct: "left",
+        explain: "Nhân 2 lũy thừa cùng cơ số: giữ nguyên cơ số, cộng số mũ 3 + 4 = 7."
+      },
+      {
+        topic: "Chuyển vế",
+        question: "Cho x - 1/2 = 3/4. Tìm x bằng quy tắc chuyển vế:",
+        left: "x = 3/4 - 1/2",
+        right: "x = 3/4 + 1/2",
+        correct: "right",
+        explain: "Khi chuyển hạng tử -1/2 sang vế phải thì đổi dấu thành +1/2."
+      },
+      {
+        topic: "Làm tròn số",
+        question: "Làm tròn số 4,567 đến chữ số thập phân thứ nhất:",
+        left: "4,5",
+        right: "4,6",
+        correct: "right",
+        explain: "Chữ số ngay sau hàng làm tròn là 6 (≥ 5) nên cộng thêm 1 thành 4,6."
+      },
+      {
+        topic: "Số thập phân",
+        question: "Phân số nào viết được thành số thập phân HỮU HẠN?",
+        left: "3/8",
+        right: "1/3",
+        correct: "left",
+        explain: "Mẫu số 8 = 2³ chỉ có ước nguyên tố 2 nên viết thành số thập phân hữu hạn (0.375)."
+      },
+      {
+        topic: "Căn bậc hai",
+        question: "Kết quả của phép tính: √100 - √36",
+        left: "4",
+        right: "8",
+        correct: "left",
+        explain: "√100 = 10; √36 = 6. Vậy 10 - 6 = 4."
+      },
+      {
+        topic: "Góc kề bù",
+        question: "Hai góc kề bù có tổng số đo bằng:",
+        left: "90°",
+        right: "180°",
+        correct: "right",
+        explain: "Hai góc kề bù có tổng số đo bằng 180 độ."
+      },
+      {
+        topic: "Góc đối đỉnh",
+        question: "Góc đối đỉnh với góc có số đo 70° sẽ có số đo là:",
+        left: "70°",
+        right: "110°",
+        correct: "left",
+        explain: "Hai góc đối đỉnh thì luôn bằng nhau."
+      },
+      {
+        topic: "Tia phân giác",
+        question: "Tia phân giác của một góc chia góc đó thành:",
+        left: "Hai góc bằng nhau",
+        right: "Hai góc bù nhau",
+        correct: "left",
+        explain: "Tia phân giác nằm giữa và tạo với hai cạnh hai góc có số đo bằng nhau."
+      },
+      {
+        topic: "Tia phân giác",
+        question: "Cho góc mOn = 100°. Ot là tia phân giác. Số đo góc mOt là:",
+        left: "50°",
+        right: "40°",
+        correct: "left",
+        explain: "100° chia đôi = 50°."
+      },
+      {
+        topic: "Đường thẳng song song",
+        question: "Cho a // b. Cặp góc SO LE TRONG sẽ:",
+        left: "Bằng nhau",
+        right: "Bù nhau",
+        correct: "left",
+        explain: "Hai góc so le trong tạo bởi hai đường thẳng song song thì bằng nhau."
+      },
+      {
+        topic: "Đường thẳng song song",
+        question: "Cho a // b. Cặp góc TRONG CÙNG PHÍA sẽ:",
+        left: "Bằng nhau",
+        right: "Bù nhau (tổng 180°)",
+        correct: "right",
+        explain: "Hai góc trong cùng phía bù nhau."
+      },
+      {
+        topic: "Tính chất song song",
+        question: "Nếu a ⊥ c và b ⊥ c (a, b phân biệt) thì:",
+        left: "a // b",
+        right: "a ⊥ b",
+        correct: "left",
+        explain: "Hai đường thẳng phân biệt cùng vuông góc với đường thứ ba thì song song."
+      },
+      {
+        topic: "Tiên đề Euclid",
+        question: "Qua một điểm ở ngoài một đường thẳng:",
+        left: "Duy nhất 1 đường song song",
+        right: "Vô số đường song song",
+        correct: "left",
+        explain: "Tiên đề Euclid: Có duy nhất một đường thẳng song song."
+      },
+      {
+        topic: "Hình khối",
+        question: "Hình hộp chữ nhật có bao nhiêu ĐỈNH?",
+        left: "6 đỉnh",
+        right: "8 đỉnh",
+        correct: "right",
+        explain: "Hình hộp chữ nhật có 8 đỉnh, 12 cạnh, 6 mặt."
+      },
+      {
+        topic: "Hình lăng trụ",
+        question: "Các mặt bên của hình lăng trụ đứng tam giác là hình gì?",
+        left: "Hình chữ nhật",
+        right: "Hình tam giác",
+        correct: "left",
+        explain: "Các mặt bên của hình lăng trụ đứng luôn là hình chữ nhật."
+      },
+      {
+        topic: "Hình khối",
+        question: "Hình lập phương có bao nhiêu CẠNH bằng nhau?",
+        left: "8 cạnh",
+        right: "12 cạnh",
+        correct: "right",
+        explain: "Hình lập phương có 12 cạnh đều có độ dài bằng nhau."
+      },
+      {
+        topic: "Hai đường vuông góc",
+        question: "Hai đường thẳng cắt nhau tạo thành một góc 90° gọi là:",
+        left: "Hai đường vuông góc",
+        right: "Hai đường song song",
+        correct: "left",
+        explain: "Định nghĩa hai đường thẳng vuông góc."
+      },
+      {
+        topic: "Dấu hiệu song song",
+        question: "Cắt nhau tạo ra một cặp góc ĐỒNG VỊ BẰNG NHAU thì:",
+        left: "Hai đường thẳng song song",
+        right: "Hai đường thẳng vuông góc",
+        correct: "left",
+        explain: "Dấu hiệu nhận biết hai đường thẳng song song."
+      },
+      {
+        topic: "Thể tích",
+        question: "Thể tích hình lập phương cạnh a là:",
+        left: "V = a³",
+        right: "V = a²",
+        correct: "left",
+        explain: "Thể tích hình lập phương V = a * a * a = a³."
+      },
+      {
+        topic: "Tính chất song song",
+        question: "Cho a // b. Nếu đường thẳng c cắt a thì:",
+        left: "c cắt đường thẳng b",
+        right: "c không bao giờ cắt b",
+        correct: "left",
+        explain: "Đường thẳng cắt một trong hai đường song song thì phải cắt đường còn lại."
+      },
+      {
+        topic: "Số hữu tỉ",
+        question: "Kết quả của phép chia 3/5 : (-3/5) là:",
+        left: "1",
+        right: "-1",
+        correct: "right",
+        explain: "Hai số đối nhau chia cho nhau thì bằng -1."
+      },
+      {
+        topic: "Lũy thừa",
+        question: "Khẳng định nào đúng với mọi x khác 0?",
+        left: "x⁰ = 1",
+        right: "x⁰ = 0",
+        correct: "left",
+        explain: "Mọi số khác 0 nâng lên lũy thừa 0 đều bằng 1."
+      },
+      {
+        topic: "Số thực",
+        question: "Tập hợp số thực R bao gồm:",
+        left: "Cả số hữu tỉ và số vô tỉ",
+        right: "Chỉ các số nguyên",
+        correct: "left",
+        explain: "Tập số thực R = Q hợp I."
+      },
+      {
+        topic: "Căn bậc hai",
+        question: "Giá trị của √(0,09) bằng:",
+        left: "0,3",
+        right: "0,03",
+        correct: "left",
+        explain: "(0,3)² = 0,09 nên căn bậc hai số học là 0,3."
+      },
+      {
+        topic: "Số đối",
+        question: "Số đối của số 0 là:",
+        left: "Không có",
+        right: "0",
+        correct: "right",
+        explain: "Số đối của 0 chính là 0."
+      },
+      {
+        topic: "Giá trị tuyệt đối",
+        question: "Có bao nhiêu số x thỏa mãn |x| = 5?",
+        left: "1 số",
+        right: "2 số (5 và -5)",
+        correct: "right",
+        explain: "x có thể bằng 5 hoặc -5."
+      },
+      {
+        topic: "Góc",
+        question: "Hai góc phụ nhau có tổng số đo bằng:",
+        left: "90°",
+        right: "180°",
+        correct: "left",
+        explain: "Định nghĩa: Hai góc phụ nhau có tổng số đo bằng 90°."
+      },
+      {
+        topic: "Hình lăng trụ",
+        question: "Hình lăng trụ đứng tứ giác có bao nhiêu MẶT?",
+        left: "6 mặt",
+        right: "8 mặt",
+        correct: "left",
+        explain: "Gồm 2 đáy và 4 mặt bên, tổng cộng 6 mặt."
+      },
+      {
+        topic: "Lũy thừa",
+        question: "Kết quả phép chia 7⁸ : 7² là:",
+        left: "7⁴",
+        right: "7⁶",
+        correct: "right",
+        explain: "Chia hai lũy thừa cùng cơ số: trừ số mũ 8 - 2 = 6."
+      },
+      {
+        topic: "Số vô tỉ",
+        question: "Số Pi (π ≈ 3,14159...) là:",
+        left: "Số hữu tỉ",
+        right: "Số vô tỉ",
+        correct: "right",
+        explain: "Pi là số thập phân vô hạn không tuần hoàn nên là số vô tỉ."
+      },
+      {
+        topic: "Phân số",
+        question: "Phân số nào sau đây tối giản?",
+        left: "2/4",
+        right: "3/7",
+        correct: "right",
+        explain: "3 và 7 có ƯCLN là 1 nên 3/7 tối giản."
+      },
+      {
+        topic: "Số thập phân",
+        question: "Chu kì của số thập phân -2,3(45) là:",
+        left: "345",
+        right: "45",
+        correct: "right",
+        explain: "Phần nằm trong dấu ngoặc đơn là chu kì: 45."
+      },
+      {
+        topic: "Đường thẳng song song",
+        question: "Hai góc đồng vị tạo bởi hai đường thẳng song song thì:",
+        left: "Bằng nhau",
+        right: "Bù nhau",
+        correct: "left",
+        explain: "Tính chất: Hai góc đồng vị thì bằng nhau."
+      },
+      {
+        topic: "Hình khối",
+        question: "Diện tích xung quanh hình hộp chữ nhật có chu vi đáy C, chiều cao h:",
+        left: "Sxq = C · h",
+        right: "Sxq = C + h",
+        correct: "left",
+        explain: "Sxq bằng chu vi đáy nhân với chiều cao."
+      },
+      {
+        topic: "Hình khối",
+        question: "Hình lập phương cạnh 2cm thì thể tích bằng:",
+        left: "6 cm³",
+        right: "8 cm³",
+        correct: "right",
+        explain: "V = 2³ = 8 cm³."
+      },
+      {
+        topic: "Số thực",
+        question: "Nếu x² = 16 thì x bằng:",
+        left: "Chỉ 4",
+        right: "4 hoặc -4",
+        correct: "right",
+        explain: "Cả 4² = 16 và (-4)² = 16."
+      },
+      {
+        topic: "Tính chất tỉ lệ",
+        question: "Từ đẳng thức a·d = b·c (b, d khác 0), ta suy ra:",
+        left: "a/b = c/d",
+        right: "a/c = d/b",
+        correct: "left",
+        explain: "Tính chất cơ bản của tỉ lệ thức."
+      },
+      {
+        topic: "Góc",
+        question: "Góc bẹt có số đo bằng bao nhiêu độ?",
+        left: "90°",
+        right: "180°",
+        correct: "right",
+        explain: "Góc bẹt có số đo đúng bằng 180°."
+      },
+      {
+        topic: "Đường trung trực",
+        question: "Đường trung trực của đoạn thẳng AB là đường thẳng:",
+        left: "Vuông góc tại trung điểm của AB",
+        right: "Chỉ đi qua trung điểm của AB",
+        correct: "left",
+        explain: "Định nghĩa đường trung trực: vuông góc tại trung điểm."
+      },
+      {
+        topic: "Hình lăng trụ",
+        question: "Thể tích lăng trụ đứng đáy S, chiều cao h tính bằng:",
+        left: "V = S · h",
+        right: "V = 1/3 · S · h",
+        correct: "left",
+        explain: "Thể tích lăng trụ đứng bằng diện tích đáy nhân chiều cao."
+      },
+      {
+        topic: "Số hữu tỉ",
+        question: "Số nào lớn hơn: -1/3 hay -1/2?",
+        left: "-1/3",
+        right: "-1/2",
+        correct: "left",
+        explain: "1/3 < 1/2 nên -1/3 > -1/2."
+      },
+      {
+        topic: "Lũy thừa",
+        question: "Giá trị của (-1)¹⁰⁰ là:",
+        left: "-1",
+        right: "1",
+        correct: "right",
+        explain: "100 là số chẵn nên (-1)¹⁰⁰ = 1."
+      },
+      {
+        topic: "Lũy thừa",
+        question: "Giá trị của (-1)⁹⁹ là:",
+        left: "-1",
+        right: "1",
+        correct: "left",
+        explain: "99 là số lẻ nên (-1)⁹⁹ = -1."
+      },
+      {
+        topic: "Số thập phân",
+        question: "Số 0,25 viết dưới dạng phân số tối giản là:",
+        left: "1/4",
+        right: "25/10",
+        correct: "left",
+        explain: "0,25 = 25/100 = 1/4."
+      },
+      {
+        topic: "Làm tròn số",
+        question: "Làm tròn số 12,345 đến hàng phần mười (chữ số thập phân 1):",
+        left: "12,3",
+        right: "12,4",
+        correct: "left",
+        explain: "Chữ số sau là 4 (< 5) nên giữ nguyên 12,3."
+      },
+      {
+        topic: "Tính nhẩm",
+        question: "Kết quả của 10 - 22,5 - 77,5 là:",
+        left: "-90",
+        right: "-100",
+        correct: "left",
+        explain: "10 - (22,5 + 77,5) = 10 - 100 = -90."
+      },
+      {
+        topic: "Quan hệ góc",
+        question: "Hai góc cùng phụ với góc thứ ba thì:",
+        left: "Bằng nhau",
+        right: "Bù nhau",
+        correct: "left",
+        explain: "Tính chất: Hai góc cùng phụ (hoặc cùng bù) với một góc thì bằng nhau."
+      },
+      {
+        topic: "Tiên đề",
+        question: "Hai đường phân biệt cùng song song với đường thứ 3 thì:",
+        left: "Song song với nhau",
+        right: "Vuông góc với nhau",
+        correct: "left",
+        explain: "Hai đường thẳng phân biệt cùng song song với đường thứ 3 thì chúng song song với nhau."
+      },
+      {
+        topic: "Số vô tỉ",
+        question: "Số 0,010010001... (số 0 tăng dần) là:",
+        left: "Số vô tỉ",
+        right: "Số hữu tỉ tuần hoàn",
+        correct: "left",
+        explain: "Dãy thập phân vô hạn không tuần hoàn là số vô tỉ."
+      },
+      {
+        topic: "Phép tính phân số",
+        question: "Giá trị của 2/3 + 1/3 · 0 là:",
+        left: "2/3",
+        right: "0",
+        correct: "left",
+        explain: "Nhân chia trước: 1/3 * 0 = 0. Sau đó 2/3 + 0 = 2/3."
+      }
+    ];
+
+    // CẤU HÌNH PHIÊN CHƠI
+    const QUESTIONS_PER_GAME = 20;
+    let currentQuestions = [];
+    let currentIndex = 0;
+    let score = 0;
+    let streak = 0;
+    let correctCount = 0;
+    let soundEnabled = true;
+    let isAnswerLocked = false;
+    let holdTimer = null;
+    let currentHoldingSide = null;
+    const HOLD_REQUIRED_MS = 700; // 0.7 giây nghiêng đầu giữ nguyên để chốt
+    let holdStartTime = 0;
+
+    // AI & CAMERA STATE
+    let isCamRunning = true;
+    let cameraInstance = null;
+    let faceMesh = null;
+    const TILT_THRESHOLD_DEG = 12;
+
+    // DOM ELEMENTS
+    const qProgress = document.getElementById("question-progress");
+    const scoreDisplay = document.getElementById("score-display");
+    const streakDisplay = document.getElementById("streak-display");
+    const topicTag = document.getElementById("topic-tag");
+    const questionText = document.getElementById("question-text");
+    const textLeft = document.getElementById("text-left");
+    const textRight = document.getElementById("text-right");
+    const cardLeft = document.getElementById("card-left");
+    const cardRight = document.getElementById("card-right");
+    const glowLeft = document.getElementById("glow-left");
+    const glowRight = document.getElementById("glow-right");
+    const pBarLeft = document.getElementById("progress-bar-left");
+    const pBarRight = document.getElementById("progress-bar-right");
+    const explainBox = document.getElementById("explain-box");
+    const statusBadge = document.getElementById("status-badge");
+    const tiltAngleDeg = document.getElementById("tilt-angle-deg");
+    const aiStatus = document.getElementById("ai-status");
+    const aiIndicator = document.getElementById("ai-indicator");
+    const camLoading = document.getElementById("cam-loading");
+
+    // THUẬT TOÁN SHUFFLE (FISHER-YATES) TRỘN ĐỀ MỚI
+    function shuffleArray(array) {
+      const cloned = [...array];
+      for (let i = cloned.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cloned[i], cloned[j]] = [cloned[j], cloned[i]];
+      }
+      return cloned;
+    }
+
+    function startNewGameSession() {
+      document.getElementById("result-modal").classList.add("hidden");
+      // Trộn toàn bộ ngân hàng câu hỏi và lấy đúng 20 câu ngẫu nhiên
+      const shuffled = shuffleArray(QUESTION_BANK);
+      currentQuestions = shuffled.slice(0, QUESTIONS_PER_GAME);
+      currentIndex = 0;
+      score = 0;
+      streak = 0;
+      correctCount = 0;
+      scoreDisplay.textContent = "0";
+      streakDisplay.textContent = "🔥 0";
+      loadQuestion(0);
+    }
+
+    // WEB AUDIO API
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new AudioContext();
+    }
+
+    function playTone(freq, type = 'sine', duration = 0.15) {
+      if (!soundEnabled) return;
+      initAudio();
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    function playSoundSuccess() {
+      if (!soundEnabled) return;
+      playTone(523.25, 'triangle', 0.1);
+      setTimeout(() => playTone(659.25, 'triangle', 0.1), 100);
+      setTimeout(() => playTone(783.99, 'triangle', 0.25), 200);
+    }
+
+    function playSoundError() {
+      if (!soundEnabled) return;
+      playTone(300, 'sawtooth', 0.2);
+      setTimeout(() => playTone(220, 'sawtooth', 0.3), 150);
+    }
+
+    function playSoundTick() {
+      playTone(880, 'sine', 0.05);
+    }
+
+    // TẢI CÂU HỎI HIỆN TẠI
+    function loadQuestion(index) {
+      if (index >= currentQuestions.length) {
+        showGameOver();
+        return;
+      }
+      isAnswerLocked = false;
+      resetTiltHold();
+      explainBox.classList.add("hidden");
+      statusBadge.classList.add("hidden");
+      
+      cardLeft.className = cardLeft.className.replace(/border-emerald-500|border-red-500|bg-emerald-950\/30|bg-red-950\/30/g, "");
+      cardRight.className = cardRight.className.replace(/border-emerald-500|border-red-500|bg-emerald-950\/30|bg-red-950\/30/g, "");
+      cardLeft.classList.add("border-blue-500/40");
+      cardRight.classList.add("border-rose-500/40");
+
+      const q = currentQuestions[index];
+      qProgress.textContent = `${index + 1}/${currentQuestions.length}`;
+      topicTag.textContent = q.topic;
+      questionText.textContent = q.question;
+      textLeft.textContent = q.left;
+      textRight.textContent = q.right;
+    }
+
+    // CHỌN PHƯƠNG ÁN
+    function selectAnswer(chosenSide) {
+      if (isAnswerLocked) return;
+      isAnswerLocked = true;
+      resetTiltHold();
+
+      const q = currentQuestions[currentIndex];
+      const isCorrect = (chosenSide === q.correct);
+
+      statusBadge.classList.remove("hidden");
+      explainBox.classList.remove("hidden");
+      explainBox.textContent = `💡 Giải thích: ${q.explain}`;
+
+      if (isCorrect) {
+        correctCount++;
+        score += 10 + (streak * 2);
+        streak += 1;
+        playSoundSuccess();
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.7 }
+        });
+
+        statusBadge.textContent = "CHÍNH XÁC! 🎉";
+        statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500 text-slate-950 animate-bounce";
+
+        if (chosenSide === "left") {
+          cardLeft.classList.add("border-emerald-500", "bg-emerald-950/40");
+        } else {
+          cardRight.classList.add("border-emerald-500", "bg-emerald-950/40");
+        }
+      } else {
+        streak = 0;
+        playSoundError();
+        statusBadge.textContent = "CHƯA ĐÚNG! ⚠️";
+        statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-500 text-white";
+
+        if (chosenSide === "left") {
+          cardLeft.classList.add("border-red-500", "bg-red-950/40");
+          cardRight.classList.add("border-emerald-500", "bg-emerald-950/40");
+        } else {
+          cardRight.classList.add("border-red-500", "bg-red-950/40");
+          cardLeft.classList.add("border-emerald-500", "bg-emerald-950/40");
+        }
+      }
+
+      scoreDisplay.textContent = score;
+      streakDisplay.textContent = `🔥 ${streak}`;
+
+      setTimeout(() => {
+        currentIndex++;
+        loadQuestion(currentIndex);
+      }, 2000);
+    }
+
+    function updateTiltProgress(side, progress) {
+      if (side === 'left') {
+        pBarLeft.style.width = `${progress * 100}%`;
+        glowLeft.style.opacity = progress;
+        pBarRight.style.width = '0%';
+        glowRight.style.opacity = 0;
+      } else if (side === 'right') {
+        pBarRight.style.width = `${progress * 100}%`;
+        glowRight.style.opacity = progress;
+        pBarLeft.style.width = '0%';
+        glowLeft.style.opacity = 0;
+      } else {
+        pBarLeft.style.width = '0%';
+        glowLeft.style.opacity = 0;
+        pBarRight.style.width = '0%';
+        glowRight.style.opacity = 0;
+      }
+    }
+
+    function resetTiltHold() {
+      currentHoldingSide = null;
+      holdStartTime = 0;
+      updateTiltProgress(null, 0);
+    }
+
+    function handleTiltDetection(detectedSide) {
+      if (isAnswerLocked) return;
+
+      if (!detectedSide) {
+        resetTiltHold();
+        return;
+      }
+
+      const now = performance.now();
+      if (currentHoldingSide !== detectedSide) {
+        currentHoldingSide = detectedSide;
+        holdStartTime = now;
+        playSoundTick();
+      } else {
+        const elapsed = now - holdStartTime;
+        const progress = Math.min(1, elapsed / HOLD_REQUIRED_MS);
+        updateTiltProgress(detectedSide, progress);
+
+        if (progress >= 1) {
+          selectAnswer(detectedSide);
+        }
+      }
+    }
+
+    // AI NHẬN DIỆN NGHIÊNG ĐẦU
+    async function initFaceAI() {
+      const videoElement = document.getElementById('webcam');
+      const canvasElement = document.getElementById('face-canvas');
+      const canvasCtx = canvasElement.getContext('2d');
+
+      aiStatus.textContent = "Đang nạp Face Mesh...";
+
+      faceMesh = new FaceMesh({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      });
+
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      faceMesh.onResults((results) => {
+        camLoading.classList.add("hidden");
+        aiStatus.textContent = "AI sẵn sàng";
+        aiIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block";
+
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+          const landmarks = results.multiFaceLandmarks[0];
+          const eyeLeftActual = landmarks[33];
+          const eyeRightActual = landmarks[263];
+
+          const deltaY = eyeRightActual.y - eyeLeftActual.y;
+          const deltaX = eyeRightActual.x - eyeLeftActual.x;
+          let angleDeg = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+          tiltAngleDeg.textContent = `${Math.round(angleDeg)}°`;
+
+          // Nghiêng đầu sang phía trái màn hình -> chọn Trái (A)
+          // Nghiêng đầu sang phía phải màn hình -> chọn Phải (B)
+          if (angleDeg > TILT_THRESHOLD_DEG) {
+            handleTiltDetection('left');
+          } else if (angleDeg < -TILT_THRESHOLD_DEG) {
+            handleTiltDetection('right');
+          } else {
+            handleTiltDetection(null);
+          }
+        } else {
+          tiltAngleDeg.textContent = "0°";
+          handleTiltDetection(null);
+        }
+        canvasCtx.restore();
+      });
+
+      try {
+        cameraInstance = new Camera(videoElement, {
+          onFrame: async () => {
+            if (isCamRunning) {
+              await faceMesh.send({ image: videoElement });
+            }
+          },
+          width: 320,
+          height: 240
+        });
+        await cameraInstance.start();
+      } catch (err) {
+        console.error("Camera Error:", err);
+        aiStatus.textContent = "Dùng phím tắt";
+        aiIndicator.className = "w-2.5 h-2.5 rounded-full bg-rose-500 inline-block";
+        camLoading.textContent = "Chế độ phím";
+        camLoading.classList.remove("hidden");
+      }
+    }
+
+    // BÀN PHÍM
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") {
+        selectAnswer("left");
+      } else if (e.key === "ArrowRight") {
+        selectAnswer("right");
+      } else if (e.key === " " || e.key === "Enter") {
+        if (isAnswerLocked) {
+          currentIndex++;
+          loadQuestion(currentIndex);
+        }
+      }
+    });
+
+    document.getElementById("sound-btn").addEventListener("click", () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById("sound-btn").textContent = soundEnabled ? "🔊" : "🔇";
+    });
+
+    document.getElementById("restart-btn").addEventListener("click", () => {
+      startNewGameSession();
+    });
+
+    document.getElementById("toggle-cam-btn").addEventListener("click", () => {
+      isCamRunning = !isCamRunning;
+      document.getElementById("cam-text").textContent = isCamRunning ? "Camera AI: Bật" : "Camera AI: Tắt";
+      document.getElementById("cam-icon").textContent = isCamRunning ? "📹" : "🚫";
+      if (!isCamRunning) {
+        resetTiltHold();
+        aiStatus.textContent = "Tạm dừng AI";
+      } else {
+        aiStatus.textContent = "AI hoạt động";
+      }
+    });
+
+    function showGameOver() {
+      const modal = document.getElementById("result-modal");
+      modal.classList.remove("hidden");
+      document.getElementById("final-score").textContent = score;
+      const acc = Math.round((correctCount / QUESTIONS_PER_GAME) * 100);
+      document.getElementById("final-accuracy").textContent = `${acc}% (${correctCount}/20)`;
+
+      confetti({
+        particleCount: 150,
+        spread: 100,
+        origin: { y: 0.6 }
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      startNewGameSession();
+      initFaceAI();
+    });
+  </script>
+</body>
+</html>
